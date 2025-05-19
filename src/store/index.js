@@ -64,7 +64,7 @@ export default createStore({
         };
         
         console.log('Sending login request with data:', loginData);
-        // console.log('API URL:', `${API_URL}/login`);
+        console.log('API URL:', `${API_URL}/auth/login`);
         const response = await axios.post(`${API_URL}/auth/login`, loginData);
         console.log('Login response:', response.data);
         
