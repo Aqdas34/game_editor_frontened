@@ -1,5 +1,5 @@
 <template>
-  <div class="games">
+  <div class="games custom-scroll">
     <div class="filters">
       <div class="search">
         <input
@@ -33,9 +33,9 @@
     <div v-else-if="filteredGames.length === 0" class="no-games">
       No games found matching your criteria.
     </div>
-    <div v-else class="grid">
+    <div v-else class="grid custom-scroll">
       <div v-for="game in filteredGames" :key="game._id" class="game-card">
-        <img :src="game.thumbnail" :alt="game.name" class="game-thumbnail">
+        <img :src="`${ASSETS_URL}/${game.thumbnail}`" :alt="game.name" class="game-thumbnail">
         <div class="game-info">
           <h3>{{ game.name }}</h3>
           <p class="author">By {{ game.author }}</p>
@@ -66,6 +66,7 @@ export default {
     const typeFilter = ref('');
     const ageFilter = ref('');
     const loading = ref(true);
+    const ASSETS_URL = process.env.VUE_APP_ASSETS_URL || 'https://game-editor-backened.onrender.com/uploads';
 
     const allGames = computed(() => store.getters.allGames);
 
@@ -100,7 +101,8 @@ export default {
       ageFilter,
       loading,
       filteredGames,
-      filterGames
+      filterGames,
+      ASSETS_URL
     };
   }
 };
@@ -111,6 +113,9 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  height: calc(100vh - 70px);
+  overflow-y: auto;
+  background-color: #f8f9fa;
 }
 
 .filters {
@@ -119,6 +124,13 @@ export default {
   flex-wrap: wrap;
   gap: 1rem;
   align-items: center;
+  position: sticky;
+  top: 0;
+  background: white;
+  padding: 1.5rem;
+  z-index: 100;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .search {
@@ -128,10 +140,17 @@ export default {
 
 .search input {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
   font-size: 1rem;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.search input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
 }
 
 .filter-options {
@@ -140,80 +159,127 @@ export default {
 }
 
 .filter-options select {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
   font-size: 1rem;
   background-color: white;
+  cursor: pointer;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.filter-options select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
 }
 
 .loading,
 .no-games {
   text-align: center;
-  padding: 2rem;
+  padding: 3rem;
   color: #666;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2rem;
+  padding: 1rem 0;
 }
 
 .game-card {
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+  display: flex;
+  flex-direction: column;
 }
 
 .game-card:hover {
   transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
 .game-thumbnail {
   width: 100%;
   height: 200px;
   object-fit: cover;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .game-info {
-  padding: 1rem;
+  padding: 1.5rem;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .game-info h3 {
   margin-bottom: 0.5rem;
   color: #2c3e50;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .author {
   color: #666;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
 }
 
 .game-meta {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .type,
 .age {
-  background-color: #f0f0f0;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  background-color: #f8f9fa;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
   font-size: 0.875rem;
-  color: #666;
+  color: #2c3e50;
+  font-weight: 500;
 }
 
 .game-actions {
-  text-align: center;
+  margin-top: auto;
 }
 
 .btn {
+  display: inline-block;
   width: 100%;
-  padding: 0.75rem;
-  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: #3498db;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background-color 0.3s;
+  text-align: center;
+  font-weight: 500;
 }
 
-@media (max-width: 768px) {
+.btn:hover {
+  background-color: #2980b9;
+}
+
+@media screen and (max-width: 768px) {
+  .games {
+    padding: 1rem;
+    height: calc(100vh - 120px);
+  }
+
   .filters {
     flex-direction: column;
+    padding: 1rem;
   }
 
   .search,
@@ -221,8 +287,13 @@ export default {
     width: 100%;
   }
 
-  .filter-options {
-    flex-direction: column;
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .game-card {
+    max-width: 100%;
   }
 }
 </style> 

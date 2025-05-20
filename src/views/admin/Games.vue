@@ -115,7 +115,7 @@
       
       <div v-else class="games-grid">
         <div v-for="game in games" :key="game._id" class="game-card">
-          <img :src="`${API_URL}/uploads/${game.thumbnail}`" :alt="game.name" class="game-thumbnail">
+          <img :src="`${ASSETS_URL}/${game.thumbnail}`" :alt="game.name" class="game-thumbnail">
           <div class="game-info">
             <h3>{{ game.name }}</h3>
             <p><strong>SKU:</strong> {{ game.sku }}</p>
@@ -199,6 +199,43 @@
             </select>
           </div>
 
+          <div class="form-group">
+            <label for="edit-thumbnail">Update Thumbnail</label>
+            <input 
+              type="file" 
+              id="edit-thumbnail" 
+              @change="handleEditThumbnailChange" 
+              accept="image/jpeg,image/png"
+              class="form-control"
+            >
+            <small class="form-text">Leave empty to keep current thumbnail</small>
+            <div v-if="editData.thumbnail" class="current-thumbnail">
+              <p>Current Thumbnail:</p>
+              <img :src="`${ASSETS_URL}/${editData.thumbnail}`" alt="Current thumbnail" class="thumbnail-preview">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-images">Update Game Images</label>
+            <input 
+              type="file" 
+              id="edit-images" 
+              @change="handleEditImagesChange" 
+              accept="image/jpeg,image/png"
+              multiple
+              class="form-control"
+            >
+            <small class="form-text">Leave empty to keep current images</small>
+            <div v-if="editData.images && editData.images.length > 0" class="current-images">
+              <p>Current Images:</p>
+              <div class="images-grid">
+                <div v-for="(image, index) in editData.images" :key="index" class="image-preview">
+                  <img :src="`${ASSETS_URL}/${image}`" :alt="`Game image ${index + 1}`">
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="form-actions">
             <button 
               type="submit" 
@@ -235,7 +272,7 @@ export default {
     const error = ref('');
     const showEditModal = ref(false);
     const API_URL = process.env.VUE_APP_API_URL;
-
+    const ASSETS_URL = 'https://game-editor-backened.onrender.com/uploads';
     const gameData = ref({
       name: '',
       author: '',
@@ -250,7 +287,11 @@ export default {
       name: '',
       author: '',
       type: '',
-      ageGroup: ''
+      ageGroup: '',
+      thumbnail: null,
+      images: [],
+      newThumbnail: null,
+      newImages: []
     });
 
     const fetchGames = async () => {
@@ -269,12 +310,15 @@ export default {
     const handleThumbnailChange = (event) => {
       const file = event.target.files[0];
       if (file) {
+        console.log('Selected thumbnail:', file.name, file.type, file.size);
         gameData.value.thumbnail = file;
       }
     };
 
     const handleImagesChange = (event) => {
       const files = Array.from(event.target.files);
+      console.log('Selected images:', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
+      
       if (files.length > 10) {
         error.value = 'Maximum 10 images allowed';
         return;
@@ -287,16 +331,45 @@ export default {
         loading.value = true;
         error.value = '';
 
+        // Validate files first
+        if (!gameData.value.thumbnail) {
+          error.value = 'Please select a thumbnail image';
+          loading.value = false;
+          return;
+        }
+        
+        if (!gameData.value.images || gameData.value.images.length === 0) {
+          error.value = 'Please select at least one game image';
+          loading.value = false;
+          return;
+        }
+
         const formData = new FormData();
+        
+        // Add text fields
         formData.append('name', gameData.value.name);
         formData.append('author', gameData.value.author);
         formData.append('type', gameData.value.type);
         formData.append('ageGroup', gameData.value.ageGroup);
+        
+        // Add files
         formData.append('thumbnail', gameData.value.thumbnail);
         
+        // Add each image file separately
         gameData.value.images.forEach(image => {
           formData.append('images', image);
         });
+
+        // Debug log for FormData contents
+        console.log('FormData contents:');
+        for (let pair of formData.entries()) {
+          const value = pair[1];
+          if (value instanceof File) {
+            console.log(`${pair[0]}: File(${value.name}, ${value.type}, ${value.size} bytes)`);
+          } else {
+            console.log(`${pair[0]}: ${value}`);
+          }
+        }
 
         await store.dispatch('createGame', formData);
         await fetchGames();
@@ -310,7 +383,13 @@ export default {
           thumbnail: null,
           images: []
         };
+
+        // Reset file inputs
+        document.getElementById('thumbnail').value = '';
+        document.getElementById('images').value = '';
+        
       } catch (err) {
+        console.error('Submit error:', err);
         error.value = err.message || 'Failed to create game';
       } finally {
         loading.value = false;
@@ -322,11 +401,50 @@ export default {
       showEditModal.value = true;
     };
 
+    const handleEditThumbnailChange = (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        editData.value.newThumbnail = file;
+      }
+    };
+
+    const handleEditImagesChange = (event) => {
+      const files = Array.from(event.target.files);
+      if (files.length > 0) {
+        editData.value.newImages = files;
+      }
+    };
+
     const handleEditSubmit = async () => {
       try {
         loading.value = true;
         error.value = '';
-        await store.dispatch('updateGame', editData.value);
+
+        const formData = new FormData();
+        
+        // Add text fields
+        formData.append('name', editData.value.name);
+        formData.append('author', editData.value.author);
+        formData.append('type', editData.value.type);
+        formData.append('ageGroup', editData.value.ageGroup);
+        
+        // Add new thumbnail if selected
+        if (editData.value.newThumbnail) {
+          formData.append('thumbnail', editData.value.newThumbnail);
+        }
+        
+        // Add new images if selected
+        if (editData.value.newImages.length > 0) {
+          editData.value.newImages.forEach(image => {
+            formData.append('images', image);
+          });
+        }
+
+        await store.dispatch('updateGame', {
+          id: editData.value._id,
+          formData
+        });
+        
         await fetchGames();
         showEditModal.value = false;
       } catch (err) {
@@ -365,10 +483,13 @@ export default {
       editData,
       showEditModal,
       API_URL,
+      ASSETS_URL,
       handleThumbnailChange,
       handleImagesChange,
       handleSubmit,
       editGame,
+      handleEditThumbnailChange,
+      handleEditImagesChange,
       handleEditSubmit,
       deleteGame
     };
@@ -379,6 +500,8 @@ export default {
 <style scoped>
 .admin-games {
   padding: 2rem;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .add-game-form {
@@ -517,6 +640,8 @@ export default {
   border-radius: 8px;
   width: 100%;
   max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .form-actions {
@@ -533,5 +658,41 @@ export default {
 
 .error {
   color: #dc3545;
+}
+
+.current-thumbnail,
+.current-images {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.thumbnail-preview {
+  max-width: 200px;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.image-preview {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 </style> 

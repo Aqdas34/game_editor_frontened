@@ -2,6 +2,8 @@ import { createStore } from 'vuex';
 import axios from 'axios';
 
 const API_URL = process.env.VUE_APP_API_URL;
+
+
 console.log('API URL:', API_URL); // Log the API URL
 
 // Configure axios defaults
@@ -114,8 +116,13 @@ export default createStore({
     async fetchGames({ commit }) {
       try {
         const response = await axios.get(`${API_URL}/games`);
-        commit('setGames', response.data);
-        return response.data;
+        // Transform the image URLs in the response data
+        console.log('Original response data:', response.data);
+        const transformedGames = response.data.map(game => ({
+          ...game,
+        }));
+        commit('setGames', transformedGames);
+        return transformedGames;
       } catch (error) {
         throw error.response.data;
       }
@@ -252,7 +259,16 @@ export default createStore({
 
     async createGame({ state }, formData) {
       try {
-        console.log('Creating new game:', formData);
+        console.log('Creating new game with FormData:');
+        for (let pair of formData.entries()) {
+          const value = pair[1];
+          if (value instanceof File) {
+            console.log(`${pair[0]}: File(${value.name}, ${value.type}, ${value.size} bytes)`);
+          } else {
+            console.log(`${pair[0]}: ${value}`);
+          }
+        }
+
         const response = await axios.post(
           `${API_URL}/games`,
           formData,
@@ -260,6 +276,10 @@ export default createStore({
             headers: { 
               Authorization: `Bearer ${state.token}`,
               'Content-Type': 'multipart/form-data'
+            },
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              console.log(`Upload progress: ${percentCompleted}%`);
             }
           }
         );
@@ -267,20 +287,23 @@ export default createStore({
         return response.data;
       } catch (error) {
         console.error('Error creating game:', error);
+        if (error.response) {
+          console.error('Error response:', error.response.data);
+        }
         throw error.response?.data || error;
       }
     },
 
-    async updateGame({ state }, gameData) {
+    async updateGame({ state }, { id, formData }) {
       try {
-        console.log('Updating game:', gameData);
+        console.log('Updating game:', id, formData);
         const response = await axios.put(
-          `${API_URL}/games/${gameData._id}`,
-          gameData,
+          `${API_URL}/games/${id}`,
+          formData,
           {
             headers: { 
               Authorization: `Bearer ${state.token}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'multipart/form-data'
             }
           }
         );

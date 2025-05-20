@@ -17,29 +17,18 @@
       </div>
 
       <div class="game-content">
-        <div class="editor-container">
-          <div class="editor-toolbar">
-            <button @click="addText" class="tool-btn">Add Text</button>
-            <button @click="togglePen" class="tool-btn" :class="{ active: isPenActive }">
-              Pen
-            </button>
-            <button @click="addShape('rect')" class="tool-btn">Rectangle</button>
-            <button @click="addShape('circle')" class="tool-btn">Circle</button>
-            <button @click="addEmoji" class="tool-btn">Add Emoji</button>
-            <button @click="saveCanvas" class="tool-btn save">Save</button>
-          </div>
-          <div class="canvas-container">
-            <canvas ref="canvas" class="editor-canvas"></canvas>
-          </div>
-        </div>
-
         <div class="game-pages">
           <div v-for="(image, index) in game.images" :key="index" class="page-card">
             <img
-              :src="image"
+              :src="`${ASSETS_URL}/${image}`"
               :alt="`Page ${index + 1}`"
               :class="{ 'blurred': !isPurchased && index >= 2 }"
             >
+            <div class="page-actions">
+              <button @click="openEditor(image, index)" class="btn btn-primary">
+                Edit Image
+              </button>
+            </div>
             <div v-if="!isPurchased && index >= 2" class="purchase-overlay">
               <p>Purchase to unlock</p>
               <button @click="purchaseGame" class="btn btn-primary">Buy Now ($9)</button>
@@ -48,6 +37,20 @@
         </div>
       </div>
     </template>
+
+    <!-- Pintura Editor Modal -->
+    <div v-if="showEditor" class="modal">
+      <div class="modal-content editor-modal">
+        <button @click="showEditor = false" class="close-btn">&times;</button>
+        <PinturaEditor
+          v-if="currentImage"
+          :src="currentImage"
+          :config="editorConfig"
+          @save="handleEditorSave"
+          @close="showEditor = false"
+        />
+      </div>
+    </div>
 
     <!-- Purchase Modal -->
     <div v-if="showPurchaseModal" class="modal">
@@ -74,106 +77,139 @@
 import { ref, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
-import { fabric } from 'fabric';
+import { PinturaEditor } from '@pqina/vue-pintura';
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripe = await loadStripe(process.env.VUE_APP_STRIPE_PUBLIC_KEY);
+const ASSETS_URL = process.env.VUE_APP_ASSETS_URL || 'https://game-editor-backened.onrender.com/uploads';
 
 export default {
   name: 'GameDetail',
+  components: {
+    PinturaEditor
+  },
   setup() {
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
-    const canvas = ref(null);
     const loading = ref(true);
     const error = ref('');
     const game = ref(null);
-    const isPenActive = ref(false);
     const showPurchaseModal = ref(false);
     const processingPayment = ref(false);
     const currentPage = ref(0);
+    const showEditor = ref(false);
+    const currentImage = ref(null);
 
     const isPurchased = computed(() => {
       return store.getters.purchasedGames.some(g => g._id === game.value?._id);
     });
 
-    const initCanvas = () => {
-      const fabricCanvas = new fabric.Canvas(canvas.value, {
-        width: 800,
-        height: 600,
-        backgroundColor: '#ffffff'
-      });
-
-      // Load the current page image
-      if (game.value?.images[currentPage.value]) {
-        fabric.Image.fromURL(game.value.images[currentPage.value], img => {
-          fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
-        });
+    const editorConfig = {
+      imageCropAspectRatio: 1,
+      imageCropMinSize: { width: 100, height: 100 },
+      styleRules: {
+        '--color-background': '#ffffff',
+        '--color-foreground': '#000000',
+        '--color-primary': '#3498db',
+        '--color-primary-text': '#ffffff',
+        '--color-secondary': '#f0f0f0',
+        '--color-secondary-text': '#000000',
+      },
+      cropSelectPresetFilter: 'landscape',
+      cropSelectPresetOptions: [
+        [1, 1],
+        [4, 3],
+        [16, 9],
+        [3, 4],
+        [9, 16],
+      ],
+      cropSelectPresetLabels: {
+        '1:1': 'Square',
+        '4:3': 'Landscape',
+        '16:9': 'Widescreen',
+        '3:4': 'Portrait',
+        '9:16': 'Mobile',
+      },
+      imageEditor: {
+        crop: true,
+        filter: true,
+        finetune: true,
+        annotate: true,
+        decorate: true,
+        resize: true,
+        rotate: true,
+        cropSelectPresetFilter: 'landscape',
+        cropSelectPresetOptions: [
+          [1, 1],
+          [4, 3],
+          [16, 9],
+          [3, 4],
+          [9, 16],
+        ],
+        cropSelectPresetLabels: {
+          '1:1': 'Square',
+          '4:3': 'Landscape',
+          '16:9': 'Widescreen',
+          '3:4': 'Portrait',
+          '9:16': 'Mobile',
+        },
       }
-
-      return fabricCanvas;
     };
 
-    const addText = () => {
-      const text = new fabric.IText('Double click to edit', {
-        left: 100,
-        top: 100,
-        fontFamily: 'Arial',
-        fontSize: 20,
-        fill: '#000000'
-      });
-      canvas.value.add(text);
-    };
+    const handleEditorSave = async (output) => {
+      try {
+        // Convert the edited image to a blob
+        const response = await fetch(output.dest);
+        const blob = await response.blob();
+        
+        // Create a FormData object to send the image
+        const formData = new FormData();
+        formData.append('image', blob, 'edited-image.png');
+        formData.append('gameId', game.value._id);
+        formData.append('pageIndex', currentPage.value);
 
-    const togglePen = () => {
-      isPenActive.value = !isPenActive.value;
-      if (isPenActive.value) {
-        canvas.value.isDrawingMode = true;
-        canvas.value.freeDrawingBrush.width = 2;
-        canvas.value.freeDrawingBrush.color = '#000000';
-      } else {
-        canvas.value.isDrawingMode = false;
+        // Send the edited image to your backend
+        const saveResponse = await fetch(`${process.env.VUE_APP_API_URL}/games/save-edited-image`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!saveResponse.ok) {
+          throw new Error('Failed to save edited image');
+        }
+
+        // Refresh the game data to show the updated image
+        const updatedGame = await saveResponse.json();
+        game.value = updatedGame;
+        showEditor.value = false;
+      } catch (err) {
+        console.error('Error saving edited image:', err);
+        error.value = 'Failed to save edited image';
       }
     };
 
-    const addShape = (type) => {
-      let shape;
-      if (type === 'rect') {
-        shape = new fabric.Rect({
-          left: 100,
-          top: 100,
-          width: 100,
-          height: 100,
-          fill: 'transparent',
-          stroke: '#000000',
-          strokeWidth: 2
-        });
-      } else if (type === 'circle') {
-        shape = new fabric.Circle({
-          left: 100,
-          top: 100,
-          radius: 50,
-          fill: 'transparent',
-          stroke: '#000000',
-          strokeWidth: 2
-        });
+    const openEditor = (image, index) => {
+      try {
+        const imageUrl = `${ASSETS_URL}/${image}`;
+        // Verify the image exists before opening the editor
+        fetch(imageUrl)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Image not found');
+            }
+            currentImage.value = imageUrl;
+            currentPage.value = index;
+            showEditor.value = true;
+          })
+          .catch(err => {
+            console.error('Error loading image:', err);
+            error.value = 'Failed to load image for editing';
+          });
+      } catch (err) {
+        console.error('Error opening editor:', err);
+        error.value = 'Failed to open image editor';
       }
-      canvas.value.add(shape);
-    };
-
-    const addEmoji = () => {
-      // Implement emoji picker and add selected emoji to canvas
-      // This is a placeholder for the emoji functionality
-    };
-
-    const saveCanvas = () => {
-      const dataURL = canvas.value.toDataURL({
-        format: 'png',
-        quality: 1
-      });
-      // Implement save functionality
-      console.log('Saving canvas:', dataURL);
     };
 
     const purchaseGame = async () => {
@@ -219,7 +255,6 @@ export default {
         const response = await fetch(`${process.env.VUE_APP_API_URL}/games/${gameId}`);
         if (!response.ok) throw new Error('Game not found');
         game.value = await response.json();
-        canvas.value = initCanvas();
       } catch (err) {
         error.value = err.message;
       } finally {
@@ -228,21 +263,20 @@ export default {
     });
 
     return {
-      canvas,
       loading,
       error,
       game,
-      isPenActive,
       showPurchaseModal,
       processingPayment,
       isPurchased,
-      addText,
-      togglePen,
-      addShape,
-      addEmoji,
-      saveCanvas,
+      showEditor,
+      currentImage,
+      editorConfig,
+      handleEditorSave,
+      openEditor,
       purchaseGame,
-      confirmPurchase
+      confirmPurchase,
+      ASSETS_URL
     };
   }
 };
@@ -270,56 +304,6 @@ export default {
   color: #666;
 }
 
-.editor-container {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-}
-
-.editor-toolbar {
-  padding: 1rem;
-  border-bottom: 1px solid #eee;
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.tool-btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.tool-btn:hover {
-  background: #f0f0f0;
-}
-
-.tool-btn.active {
-  background: #3498db;
-  color: white;
-  border-color: #3498db;
-}
-
-.tool-btn.save {
-  background: #2ecc71;
-  color: white;
-  border-color: #2ecc71;
-}
-
-.canvas-container {
-  padding: 1rem;
-  display: flex;
-  justify-content: center;
-}
-
-.editor-canvas {
-  border: 1px solid #ddd;
-}
-
 .game-pages {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -341,6 +325,23 @@ export default {
 
 .page-card img.blurred {
   filter: blur(10px);
+}
+
+.page-actions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.page-card:hover .page-actions {
+  opacity: 1;
 }
 
 .purchase-overlay {
@@ -369,14 +370,36 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1000;
 }
 
 .modal-content {
   background: white;
   padding: 2rem;
   border-radius: 8px;
-  max-width: 500px;
+  max-width: 90%;
   width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.editor-modal {
+  padding: 0;
+  width: 95%;
+  height: 95vh;
+  max-width: none;
+}
+
+.close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: white;
+  cursor: pointer;
+  z-index: 1001;
 }
 
 .modal-content h2 {
@@ -393,10 +416,32 @@ export default {
   margin-bottom: 1.5rem;
 }
 
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #2980b9;
+}
+
 .btn-secondary {
   background: #95a5a6;
   color: white;
   margin-left: 1rem;
+}
+
+.btn-secondary:hover {
+  background: #7f8c8d;
 }
 
 .loading,

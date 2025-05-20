@@ -33,11 +33,10 @@ export default {
 <style scoped>
 .admin {
   display: flex;
-  min-height: 100vh;
+  min-height: calc(100vh - 70px);
   width: 100%;
-  position: fixed;
-  top: 0;
-  left: 0;
+  margin-top: 70px;
+  position: relative;
 }
 
 .admin-sidebar {
@@ -45,11 +44,12 @@ export default {
   background-color: #2c3e50;
   color: white;
   padding: 2rem 0;
-  height: 100vh;
+  height: calc(100vh - 70px);
   position: fixed;
   left: 0;
-  top: 0;
+  top: 70px;
   z-index: 1000;
+  overflow-y: auto;
 }
 
 .admin-sidebar h2 {
@@ -85,8 +85,29 @@ export default {
   flex: 1;
   padding: 2rem;
   background-color: #f8f9fa;
-  margin-left: 250px; /* Same as sidebar width */
-  min-height: 100vh;
+  min-height: calc(100vh - 70px);
+  margin-left: 250px;
   width: calc(100% - 250px);
+  overflow-y: auto;
+}
+
+/* Responsive styles */
+@media screen and (max-width: 768px) {
+  .admin {
+    flex-direction: column;
+    margin-top: 120px;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+    top: 0;
+  }
+
+  .admin-content {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 </style> 

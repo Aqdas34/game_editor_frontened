@@ -5,7 +5,6 @@
     <div class="filters">
       <select v-model="statusFilter" class="filter-select">
         <option value="all">All Users</option>
-        <option value="pending">Pending Approval</option>
         <option value="active">Active</option>
         <option value="suspended">Suspended</option>
       </select>
@@ -239,6 +238,23 @@ export default {
 <style scoped>
 .admin-users {
   padding: 2rem;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+h1 {
+  margin-bottom: 1.5rem;
+}
+
+.filters {
+  margin-bottom: 2rem;
+  position: sticky;
+  top: 0;
+  background-color: white;
+  padding: 1rem 0;
+  z-index: 2;
 }
 
 .debug-info {
@@ -247,14 +263,13 @@ export default {
   margin-bottom: 1rem;
   border-radius: 4px;
   font-family: monospace;
+  position: sticky;
+  top: 80px; /* Adjust based on filters height */
+  z-index: 1;
 }
 
 .debug-info p {
   margin: 0.5rem 0;
-}
-
-.filters {
-  margin-bottom: 2rem;
 }
 
 .filter-select {
@@ -267,12 +282,21 @@ export default {
 .users-table {
   width: 100%;
   overflow-x: auto;
+  max-height: 600px; /* Fixed height for the table container */
+  overflow-y: auto; /* Enable vertical scrolling */
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 1rem;
+}
+
+thead {
+  position: sticky; /* Make the header sticky */
+  top: 0;
+  background-color: #f8f9fa;
+  z-index: 1;
 }
 
 th, td {

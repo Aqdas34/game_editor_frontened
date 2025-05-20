@@ -8,6 +8,8 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "@pqina/pintura": "^8.92.14",
+    "@pqina/vue-pintura": "^9.0.2",
     "@stripe/stripe-js": "^7.3.0",
     "assert": "^2.1.0",
     "axios": "^1.9.0",

@@ -90,7 +90,8 @@ export default {
         await store.dispatch('register', {
           name: name.value,
           email: email.value,
-          password: password.value
+          password: password.value,
+          status: 'active'
         });
         
         router.push('/');
