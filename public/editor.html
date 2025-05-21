@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Image Editor</title>
+  <link rel="stylesheet" href="https://unpkg.com/@pqina/pintura@8.92.14/css/pintura.css">
+  <style>
+    body { 
+      margin: 0; 
+      padding: 0; 
+      height: 100vh; 
+      background: #f0f0f0;
+    }
+    .editor-container { 
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .editor-header {
+      background: white;
+      padding: 1rem;
+      border-bottom: 1px solid #ddd;
+    }
+    .editor-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="editor-container">
+    <div class="editor-header">
+      <h1>Image Editor</h1>
+    </div>
+    <div id="editor" style="flex: 1;"></div>
+  </div>
+  <script src="https://unpkg.com/@pqina/pintura@8.92.14/pintura.js"></script>
+  <script>
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const imageUrl = urlParams.get('image');
+    const gameId = urlParams.get('gameId');
+    const pageIndex = urlParams.get('pageIndex');
+
+    // Initialize editor
+    const editor = Pintura.openDefaultEditor({
+      src: imageUrl,
+      imageCropAspectRatio: 1,
+      imageCropMinSize: { width: 100, height: 100 },
+      styleRules: {
+        '--color-background': '#ffffff',
+        '--color-foreground': '#000000',
+        '--color-primary': '#3498db',
+        '--color-primary-text': '#ffffff',
+        '--color-secondary': '#f0f0f0',
+        '--color-secondary-text': '#000000',
+      },
+      imageEditor: {
+        crop: true,
+        filter: true,
+        finetune: true,
+        annotate: {
+          enabled: true,
+          tools: ['text', 'draw', 'shape', 'emoji'],
+          text: {
+            fontFamily: ['Arial', 'Helvetica', 'Times New Roman', 'Courier New'],
+            fontSize: [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64],
+            fontStyle: ['normal', 'italic'],
+            fontWeight: ['normal', 'bold'],
+            textAlign: ['left', 'center', 'right'],
+            color: true,
+            backgroundColor: true,
+            padding: true,
+            borderRadius: true,
+            shadow: true
+          },
+          draw: {
+            enabled: true,
+            brushSize: [1, 2, 4, 8, 16, 32],
+            brushColor: true,
+            brushOpacity: true,
+            brushMode: ['pen', 'highlighter']
+          },
+          shape: {
+            enabled: true,
+            shapes: ['rectangle', 'ellipse', 'line', 'arrow', 'polygon'],
+            strokeWidth: [1, 2, 4, 8],
+            strokeColor: true,
+            fillColor: true,
+            opacity: true
+          },
+          emoji: {
+            enabled: true,
+            categories: ['smileys', 'animals', 'food', 'activities', 'travel', 'objects', 'symbols', 'flags'],
+            size: [16, 24, 32, 48, 64]
+          }
+        },
+        decorate: true,
+        resize: true,
+        rotate: true
+      },
+      // Add these settings to ensure tools are visible
+      enableToolbar: true,
+      toolbar: {
+        items: [
+          'crop',
+          'filter',
+          'finetune',
+          'annotate',
+          'decorate',
+          'resize',
+          'rotate'
+        ]
+      },
+      // Ensure the editor is properly sized
+      imageEditor: {
+        crop: true,
+        filter: true,
+        finetune: true,
+        annotate: {
+          enabled: true,
+          tools: ['text', 'draw', 'shape', 'emoji'],
+          text: {
+            fontFamily: ['Arial', 'Helvetica', 'Times New Roman', 'Courier New'],
+            fontSize: [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64],
+            fontStyle: ['normal', 'italic'],
+            fontWeight: ['normal', 'bold'],
+            textAlign: ['left', 'center', 'right'],
+            color: true,
+            backgroundColor: true,
+            padding: true,
+            borderRadius: true,
+            shadow: true
+          },
+          draw: {
+            enabled: true,
+            brushSize: [1, 2, 4, 8, 16, 32],
+            brushColor: true,
+            brushOpacity: true,
+            brushMode: ['pen', 'highlighter']
+          },
+          shape: {
+            enabled: true,
+            shapes: ['rectangle', 'ellipse', 'line', 'arrow', 'polygon'],
+            strokeWidth: [1, 2, 4, 8],
+            strokeColor: true,
+            fillColor: true,
+            opacity: true
+          },
+          emoji: {
+            enabled: true,
+            categories: ['smileys', 'animals', 'food', 'activities', 'travel', 'objects', 'symbols', 'flags'],
+            size: [16, 24, 32, 48, 64]
+          }
+        },
+        decorate: true,
+        resize: true,
+        rotate: true
+      }
+    });
+
+    // Handle save
+    editor.on('save', async (output) => {
+      try {
+        const response = await fetch(output.dest);
+        const blob = await response.blob();
+        
+        const formData = new FormData();
+        formData.append('image', blob, 'edited-image.png');
+        formData.append('gameId', gameId);
+        formData.append('pageIndex', pageIndex);
+
+        const saveResponse = await fetch('/api/games/save-edited-image', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!saveResponse.ok) {
+          throw new Error('Failed to save edited image');
+        }
+
+        window.opener.location.reload();
+        window.close();
+      } catch (err) {
+        console.error('Error saving edited image:', err);
+        alert('Failed to save edited image');
+      }
+    });
+
+    // Handle close
+    editor.on('close', () => {
+      window.close();
+    });
+  </script>
+</body>
+</html> 

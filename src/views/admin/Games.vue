@@ -473,6 +473,7 @@ export default {
 
     onMounted(() => {
       fetchGames();
+  
     });
 
     return {

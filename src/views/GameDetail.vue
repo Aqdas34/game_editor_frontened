@@ -1,457 +1,384 @@
 <template>
-  <div class="game-detail">
-    <div v-if="loading" class="loading">
-      Loading game...
+  <div class="editor-container">
+    <div class="editor-header">
+      <h1>{{ name }}</h1>
+      <div class="meta-info">
+        <span>Age: {{ age }}</span>
+        <span>SKU: {{ sku }}</span>
+      </div>
     </div>
-    <div v-else-if="error" class="error">
-      {{ error }}
-    </div>
-    <template v-else>
-      <div class="game-header">
-        <h1>{{ game.name }}</h1>
-        <div class="game-meta">
-          <span class="author">By {{ game.author }}</span>
-          <span class="type">{{ game.type }}</span>
-          <span class="age">{{ game.ageGroup }}</span>
-        </div>
+
+    <div class="editor-workspace">
+      <div class="tools-panel">
+        <button 
+          v-for="tool in tools" 
+          :key="tool.name"
+          @click="selectTool(tool)"
+          :class="['tool-btn', { active: currentTool === tool.name }]"
+        >
+          <span class="tool-icon">{{ tool.icon }}</span>
+          <span class="tool-name">{{ tool.name }}</span>
+        </button>
       </div>
 
-      <div class="game-content">
-        <div class="game-pages">
-          <div v-for="(image, index) in game.images" :key="index" class="page-card">
-            <img
-              :src="`${ASSETS_URL}/${image}`"
-              :alt="`Page ${index + 1}`"
-              :class="{ 'blurred': !isPurchased && index >= 2 }"
-            >
-            <div class="page-actions">
-              <button @click="openEditor(image, index)" class="btn btn-primary">
-                Edit Image
-              </button>
-            </div>
-            <div v-if="!isPurchased && index >= 2" class="purchase-overlay">
-              <p>Purchase to unlock</p>
-              <button @click="purchaseGame" class="btn btn-primary">Buy Now ($9)</button>
-            </div>
+      <div class="canvas-area">
+        <div class="thumbnails-panel">
+          <div 
+            v-for="(image, index) in images" 
+            :key="index"
+            class="thumbnail"
+            :class="{ active: selectedImageIndex === index }"
+            @click="selectImage(index)"
+          >
+            <img :src="`https://game-editor-backened.onrender.com/uploads/users/${userId}/${route.params.id}/${image}`" :alt="'Thumbnail ' + (index + 1)">
           </div>
         </div>
-      </div>
-    </template>
 
-    <!-- Pintura Editor Modal -->
-    <div v-if="showEditor" class="modal">
-      <div class="modal-content editor-modal">
-        <button @click="showEditor = false" class="close-btn">&times;</button>
-        <PinturaEditor
-          v-if="currentImage"
-          :src="currentImage"
-          :config="editorConfig"
-          @save="handleEditorSave"
-          @close="showEditor = false"
-        />
+        <div class="main-canvas">
+          <pintura-editor
+            v-if="showEditor"
+            v-bind="editorProps"
+            :src="currentImage"
+            @pintura:process="handleProcess"
+            @pintura:load="handleLoad"
+            style="height: 100%"
+          />
+        </div>
       </div>
     </div>
 
-    <!-- Purchase Modal -->
-    <div v-if="showPurchaseModal" class="modal">
-      <div class="modal-content">
-        <h2>Purchase Game</h2>
-        <p>Complete your purchase to unlock all game pages</p>
-        <div id="payment-element"></div>
-        <button
-          @click="confirmPurchase"
-          class="btn btn-primary"
-          :disabled="processingPayment"
-        >
-          {{ processingPayment ? 'Processing...' : 'Complete Purchase' }}
-        </button>
-        <button @click="showPurchaseModal = false" class="btn btn-secondary">
-          Cancel
-        </button>
-      </div>
+    <div class="editor-footer">
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
-import { useStore } from 'vuex';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, watch } from 'vue';
 import { PinturaEditor } from '@pqina/vue-pintura';
-import { loadStripe } from '@stripe/stripe-js';
+import axios from 'axios';
+import { useRoute } from 'vue-router';
+import { useStore } from 'vuex';
+import {
+  // editor
+  createDefaultImageReader,
+  createDefaultImageWriter,
+  createDefaultShapePreprocessor,
+  locale_en_gb,
+  getEditorDefaults,
+  
+  // plugins
+  setPlugins,
+  plugin_crop,
+  plugin_crop_locale_en_gb,
+  plugin_filter,
+  plugin_filter_defaults,
+  plugin_filter_locale_en_gb,
+  plugin_finetune,
+  plugin_finetune_defaults,
+  plugin_finetune_locale_en_gb,
+  plugin_annotate,
+  plugin_annotate_locale_en_gb,
+  markup_editor_defaults,
+  markup_editor_locale_en_gb,
+} from '@pqina/pintura';
 
-const stripe = await loadStripe(process.env.VUE_APP_STRIPE_PUBLIC_KEY);
-const ASSETS_URL = process.env.VUE_APP_ASSETS_URL || 'https://game-editor-backened.onrender.com/uploads';
+// Import Pintura styles
+import '@pqina/pintura/pintura.css';
+
+// Set up plugins
+setPlugins(plugin_crop, plugin_finetune, plugin_filter, plugin_annotate);
 
 export default {
-  name: 'GameDetail',
+  name: 'ImageEditor',
   components: {
     PinturaEditor
   },
   setup() {
-    const store = useStore();
     const route = useRoute();
-    const router = useRouter();
-    const loading = ref(true);
-    const error = ref('');
-    const game = ref(null);
-    const showPurchaseModal = ref(false);
-    const processingPayment = ref(false);
-    const currentPage = ref(0);
-    const showEditor = ref(false);
+    const store = useStore();
+    const userId = store.getters.currentUser?.id;
+    // Ensure axios sends the token for all requests
+    if (store.state.token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${store.state.token}`;
+    }
+    const name = ref('');
+    const age = ref('');
+    const sku = ref('');
+    const currentTool = ref('text');
+    const selectedImageIndex = ref(0);
+    const showEditor = ref(true);
     const currentImage = ref(null);
+    const images = ref([]);
+    const API_URL = process.env.VUE_APP_API_URL;
+    const inlineResult = ref(null);
 
-    const isPurchased = computed(() => {
-      return store.getters.purchasedGames.some(g => g._id === game.value?._id);
-    });
+    const tools = [
+      { name: 'text', icon: 'A' }
+    ];
 
-    const editorConfig = {
-      imageCropAspectRatio: 1,
-      imageCropMinSize: { width: 100, height: 100 },
-      styleRules: {
-        '--color-background': '#ffffff',
-        '--color-foreground': '#000000',
-        '--color-primary': '#3498db',
-        '--color-primary-text': '#ffffff',
-        '--color-secondary': '#f0f0f0',
-        '--color-secondary-text': '#000000',
-      },
-      cropSelectPresetFilter: 'landscape',
-      cropSelectPresetOptions: [
-        [1, 1],
-        [4, 3],
-        [16, 9],
-        [3, 4],
-        [9, 16],
-      ],
-      cropSelectPresetLabels: {
-        '1:1': 'Square',
-        '4:3': 'Landscape',
-        '16:9': 'Widescreen',
-        '3:4': 'Portrait',
-        '9:16': 'Mobile',
+    const editorProps = {
+      ...getEditorDefaults(),
+      imageReader: createDefaultImageReader(),
+      imageWriter: createDefaultImageWriter(),
+      shapePreprocessor: createDefaultShapePreprocessor(),
+      ...plugin_finetune_defaults,
+      ...plugin_filter_defaults,
+      ...markup_editor_defaults,
+      locale: {
+        ...locale_en_gb,
+        ...plugin_crop_locale_en_gb,
+        ...plugin_finetune_locale_en_gb,
+        ...plugin_filter_locale_en_gb,
+        ...plugin_annotate_locale_en_gb,
+        ...markup_editor_locale_en_gb,
       },
       imageEditor: {
-        crop: true,
-        filter: true,
-        finetune: true,
-        annotate: true,
-        decorate: true,
-        resize: true,
-        rotate: true,
-        cropSelectPresetFilter: 'landscape',
-        cropSelectPresetOptions: [
-          [1, 1],
-          [4, 3],
-          [16, 9],
-          [3, 4],
-          [9, 16],
-        ],
-        cropSelectPresetLabels: {
-          '1:1': 'Square',
-          '4:3': 'Landscape',
-          '16:9': 'Widescreen',
-          '3:4': 'Portrait',
-          '9:16': 'Mobile',
-        },
-      }
-    };
-
-    const handleEditorSave = async (output) => {
-      try {
-        // Convert the edited image to a blob
-        const response = await fetch(output.dest);
-        const blob = await response.blob();
-        
-        // Create a FormData object to send the image
-        const formData = new FormData();
-        formData.append('image', blob, 'edited-image.png');
-        formData.append('gameId', game.value._id);
-        formData.append('pageIndex', currentPage.value);
-
-        // Send the edited image to your backend
-        const saveResponse = await fetch(`${process.env.VUE_APP_API_URL}/games/save-edited-image`, {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!saveResponse.ok) {
-          throw new Error('Failed to save edited image');
+        annotate: {
+          tools: ['text'],
+          text: {
+            fontFamily: ['Arial', 'Helvetica', 'Times New Roman'],
+            fontSize: [12, 16, 24, 36],
+            textAlign: ['left', 'center', 'right'],
+          }
         }
-
-        // Refresh the game data to show the updated image
-        const updatedGame = await saveResponse.json();
-        game.value = updatedGame;
-        showEditor.value = false;
-      } catch (err) {
-        console.error('Error saving edited image:', err);
-        error.value = 'Failed to save edited image';
       }
     };
 
-    const openEditor = (image, index) => {
-      try {
-        const imageUrl = `${ASSETS_URL}/${image}`;
-        // Verify the image exists before opening the editor
-        fetch(imageUrl)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Image not found');
-            }
-            currentImage.value = imageUrl;
-            currentPage.value = index;
-            showEditor.value = true;
-          })
-          .catch(err => {
-            console.error('Error loading image:', err);
-            error.value = 'Failed to load image for editing';
-          });
-      } catch (err) {
-        console.error('Error opening editor:', err);
-        error.value = 'Failed to open image editor';
+    const selectTool = (tool) => {
+      currentTool.value = tool.name;
+      if (tool.name === 'text') {
+        editorProps.imageEditor.annotate.tools = ['text'];
       }
     };
 
-    const purchaseGame = async () => {
-      try {
-        const { clientSecret } = await store.dispatch('createOrder', game.value._id);
-        showPurchaseModal.value = true;
-
-        const elements = stripe.elements({ clientSecret });
-        const paymentElement = elements.create('payment');
-        paymentElement.mount('#payment-element');
-      } catch (error) {
-        console.error('Error initiating purchase:', error);
-      }
+    const selectImage = (index) => {
+      selectedImageIndex.value = index;
+      currentImage.value = `http://localhost:5000/uploads/users/${userId}/${route.params.id}/${images.value[index]}`;
     };
 
-    const confirmPurchase = async () => {
+    const handleProcess = async (event) => {
       try {
-        processingPayment.value = true;
-        const { error } = await stripe.confirmPayment({
-          elements: stripe.elements(),
-          confirmParams: {
-            return_url: `${window.location.origin}/games/${game.value._id}`
+        inlineResult.value = URL.createObjectURL(event.detail.dest);
+        const formData = new FormData();
+        formData.append('image', event.detail.dest);
+        formData.append('userId', userId);
+        formData.append('gameId', route.params.id);
+        formData.append('pageIndex', selectedImageIndex.value);
+        await axios.post(`${API_URL}/games/save-edited-image-for-user`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
           }
         });
-
-        if (error) {
-          throw error;
-        }
-
-        await store.dispatch('confirmOrder', game.value._id);
-        showPurchaseModal.value = false;
-        router.go(0); // Refresh the page to show purchased content
+        await fetchUserGameImages();
       } catch (error) {
-        console.error('Error processing payment:', error);
-      } finally {
-        processingPayment.value = false;
+        console.error('Error saving edited image:', error);
       }
     };
 
-    onMounted(async () => {
+    const handleLoad = () => {
+      console.log('Editor loaded');
+    };
+
+    // Duplicate images for user and load them
+    const fetchUserGameImages = async () => {
       try {
-        const gameId = route.params.id;
-        const response = await fetch(`${process.env.VUE_APP_API_URL}/games/${gameId}`);
-        if (!response.ok) throw new Error('Game not found');
-        game.value = await response.json();
-      } catch (err) {
-        error.value = err.message;
-      } finally {
-        loading.value = false;
+        console.log('Calling duplicate-for-user:', userId, route.params.id);
+        await axios.post(`${API_URL}/games/${route.params.id}/duplicate-for-user`, { userId });
+        const response = await axios.get(`${API_URL}/games/${route.params.id}/user-images/${userId}`);
+        const game = response.data;
+        name.value = game.name;
+        age.value = game.ageGroup;
+        sku.value = game.sku;
+        images.value = game.images;
+        if (images.value.length > 0) {
+          currentImage.value = `https://game-editor-backened.onrender.com/uploads/users/${userId}/${route.params.id}/${images.value[0]}`;
+        }
+      } catch (error) {
+        console.error('Error fetching user game images:', error);
       }
-    });
+    };
+
+    console.log('store.getters.currentUser:', store.getters.currentUser);
+    console.log('userId:', userId);
+
+    watch(() => store.getters.currentUser, (newUser) => {
+      if (newUser && newUser.id) fetchUserGameImages();
+    }, { immediate: true });
 
     return {
-      loading,
-      error,
-      game,
-      showPurchaseModal,
-      processingPayment,
-      isPurchased,
+      name,
+      age,
+      sku,
+      tools,
+      images,
+      currentTool,
+      selectedImageIndex,
       showEditor,
       currentImage,
-      editorConfig,
-      handleEditorSave,
-      openEditor,
-      purchaseGame,
-      confirmPurchase,
-      ASSETS_URL
+      editorProps,
+      inlineResult,
+      selectTool,
+      selectImage,
+      handleProcess,
+      handleLoad,
+      userId,
+      route
     };
   }
 };
 </script>
 
-<style scoped>
-.game-detail {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-}
-
-.game-header {
-  margin-bottom: 2rem;
-}
-
-.game-header h1 {
-  color: #2c3e50;
-  margin-bottom: 1rem;
-}
-
-.game-meta {
+<style>
+.editor-container {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.editor-header {
+  padding: 1rem;
+  background-color: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.editor-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.meta-info {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
   color: #666;
 }
 
-.game-pages {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
+.meta-info span {
+  margin-right: 1rem;
 }
 
-.page-card {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.page-card img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-}
-
-.page-card img.blurred {
-  filter: blur(10px);
-}
-
-.page-actions {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.7);
+.editor-workspace {
   display: flex;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s;
+  flex: 1;
+  overflow: hidden;
 }
 
-.page-card:hover .page-actions {
-  opacity: 1;
-}
-
-.purchase-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+.tools-panel {
+  width: 80px;
+  background-color: #2c3e50;
+  padding: 1rem 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  color: white;
-  padding: 1rem;
-  text-align: center;
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+.tool-btn {
+  width: 60px;
+  height: 60px;
+  border: none;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  margin-bottom: 1rem;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  z-index: 1000;
+  justify-content: center;
+  transition: background-color 0.3s;
 }
 
-.modal-content {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  max-width: 90%;
-  width: 90%;
-  max-height: 90vh;
+.tool-btn.active {
+  background-color: #34495e;
+}
+
+.tool-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.tool-name {
+  font-size: 0.8rem;
+}
+
+.canvas-area {
+  flex: 1;
+  display: flex;
+  padding: 1rem;
+}
+
+.thumbnails-panel {
+  width: 200px;
+  padding-right: 1rem;
   overflow-y: auto;
 }
 
-.editor-modal {
-  padding: 0;
-  width: 95%;
-  height: 95vh;
-  max-width: none;
-}
-
-.close-btn {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: white;
-  cursor: pointer;
-  z-index: 1001;
-}
-
-.modal-content h2 {
+.thumbnail {
+  width: 100%;
+  height: 100px;
   margin-bottom: 1rem;
-  color: #2c3e50;
+  border: 2px solid transparent;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: 4px;
 }
 
-.modal-content p {
-  margin-bottom: 1.5rem;
-  color: #666;
+.thumbnail.active {
+  border-color: #3498db;
 }
 
-#payment-element {
-  margin-bottom: 1.5rem;
+.thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.btn {
-  padding: 0.75rem 1.5rem;
+.main-canvas {
+  flex: 1;
+  background-color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  height: 100%;
+}
+
+.editor-footer {
+  padding: 1rem;
+  background-color: #fff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.action-btn {
+  padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.3s;
+  background-color: #e0e0e0;
+  color: #333;
+  transition: background-color 0.3s;
 }
 
-.btn-primary {
-  background: #3498db;
-  color: white;
+.action-btn.primary {
+  background-color: #3498db;
+  color: #fff;
 }
 
-.btn-primary:hover {
-  background: #2980b9;
+.action-btn:hover {
+  opacity: 0.9;
 }
 
-.btn-secondary {
-  background: #95a5a6;
-  color: white;
-  margin-left: 1rem;
+/* Pintura editor custom styles */
+:root {
+  --pintura-color-primary: #3498db;
+  --pintura-color-secondary: #2c3e50;
 }
 
-.btn-secondary:hover {
-  background: #7f8c8d;
+.pintura-editor {
+  width: 100%;
+  height: 100%;
 }
-
-.loading,
-.error {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
-}
-
-.error {
-  color: #e74c3c;
-}
-</style> 
+</style>
