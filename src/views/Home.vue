@@ -3,7 +3,7 @@
     <section class="hero">
       <h1>Welcome to Game Platform</h1>
       <p>Discover and play interactive games with our powerful image editor</p>
-      <router-link to="/games" class="btn btn-primary">Browse Games</router-link>
+      <button @click="navigateToGames" class="btn btn-primary">Browse Games</button>
     </section>
 
     <section class="features">
@@ -25,11 +25,11 @@
       <h2>Latest Games</h2>
       <div class="grid">
         <div v-for="game in latestGames" :key="game._id" class="game-card">
-          <img :src="game.thumbnail" :alt="game.name" class="game-thumbnail">
+          <img :src="`${assetUrl}/${game.thumbnail}`" :alt="game.name" class="game-thumbnail">
           <div class="game-info">
             <h3>{{ game.name }}</h3>
             <p>{{ game.author }}</p>
-            <router-link :to="`/games/${game._id}`" class="btn btn-primary">View Game</router-link>
+            <button @click="viewGame(game._id)" class="btn btn-primary">View Game</button>
           </div>
         </div>
       </div>
@@ -40,15 +40,37 @@
 <script>
 import { computed, onMounted } from 'vue';
 import { useStore } from 'vuex';
+import { useRouter } from 'vue-router';
 
 export default {
   name: 'HomeView',
   setup() {
     const store = useStore();
+    const router = useRouter();
 
     const latestGames = computed(() => {
       return store.getters.allGames.slice(0, 4);
     });
+
+    const isAuthenticated = computed(() => store.getters.isAuthenticated);
+
+    const assetUrl = process.env.VUE_APP_ASSETS_URL;
+    console.log('Asset URL:', assetUrl);
+    const navigateToGames = () => {
+      if (isAuthenticated.value) {
+        router.push('/games');
+      } else {
+        router.push('/login');
+      }
+    };
+
+    const viewGame = (gameId) => {
+      if (isAuthenticated.value) {
+        router.push(`/games/${gameId}`);
+      } else {
+        router.push('/login');
+      }
+    };
 
     onMounted(async () => {
       try {
@@ -59,7 +81,11 @@ export default {
     });
 
     return {
-      latestGames
+      latestGames,
+      navigateToGames,
+      viewGame,
+      isAuthenticated,
+      assetUrl
     };
   }
 };

@@ -57,37 +57,26 @@ export default createStore({
   actions: {
     async login({ commit }, credentials) {
       try {
-        // console.log('Login attempt with credentials:', credentials);
-        
-        // Ensure credentials are in the correct format
         const loginData = {
           email: credentials.email,
           password: credentials.password
         };
-        
-        console.log('Sending login request with data:', loginData);
-        console.log('API URL:', `${API_URL}/auth/login`);
         const response = await axios.post(`${API_URL}/auth/login`, loginData);
-        console.log('Login response:', response.data);
-        
         if (response.data.token && response.data.user) {
-          // Set the token in axios defaults for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-          
           commit('setToken', response.data.token);
           commit('setUser', response.data.user);
+          // Redirect based on user role
+          if (response.data.user.role === 'admin') {
+            window.location.href = '/'; // Redirect admin to main page
+          } else {
+            window.location.href = '/games'; // Redirect regular users to games page
+          }
           return response.data;
         } else {
-          console.error('Invalid response format:', response.data);
           throw new Error('Invalid response format from server');
         }
       } catch (error) {
-        console.error('Login error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
-        });
-        
         if (error.response) {
           throw new Error(error.response.data.message || 'Login failed');
         } else if (error.request) {
@@ -331,6 +320,64 @@ export default createStore({
       } catch (error) {
         console.error('Error deleting game:', error);
         throw error.response?.data || error;
+      }
+    },
+
+    async fetchUserProfile({ commit, state }) {
+      try {
+        if (!state.token) {
+          throw new Error('No authentication token found');
+        }
+        
+        const response = await axios.get(`${API_URL}/users/current`, {
+          headers: { Authorization: `Bearer ${state.token}` }
+        });
+        
+        commit('setUser', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        throw error.response?.data || error;
+      }
+    },
+    
+    async checkGameOwnership({ state }, gameId) {
+      try {
+        if (!state.token) {
+          return { owned: false };
+        }
+        
+        const response = await axios.get(`${API_URL}/games/${gameId}/check-ownership`, {
+          headers: { Authorization: `Bearer ${state.token}` }
+        });
+        
+        return response.data;
+      } catch (error) {
+        console.error('Error checking game ownership:', error);
+        
+        // Fallback to checking from local data
+        if (state.user && state.user.purchasedGames) {
+          const owned = state.user.purchasedGames.some(id => 
+            id === gameId || id.toString() === gameId.toString()
+          );
+          return { owned };
+        }
+        
+        return { owned: false };
+      }
+    },
+
+    async fetchAllOrders({ commit, state }) {
+      try {
+        const response = await axios.get(`${API_URL}/orders`, {
+          headers: { Authorization: `Bearer ${state.token}` }
+        });
+        console.log('Fetched orders:', response.data); // Log the fetched orders
+        commit('setOrders', response.data);
+        return response.data; // Ensure the data is returned
+      } catch (error) {
+        console.error('Error fetching all orders:', error);
+        throw error.response.data;
       }
     }
   }

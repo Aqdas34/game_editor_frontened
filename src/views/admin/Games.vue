@@ -272,7 +272,7 @@ export default {
     const error = ref('');
     const showEditModal = ref(false);
     const API_URL = process.env.VUE_APP_API_URL;
-    const ASSETS_URL = 'https://game-editor-backened.onrender.com/uploads';
+    const ASSETS_URL = 'http://localhost:5000/uploads';
     const gameData = ref({
       name: '',
       author: '',
@@ -316,7 +316,7 @@ export default {
     };
 
     const handleImagesChange = (event) => {
-      const files = Array.from(event.target.files);
+      const files = event.target.files ? Array.from(event.target.files) : [];
       console.log('Selected images:', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
       
       if (files.length > 10) {
@@ -356,9 +356,11 @@ export default {
         formData.append('thumbnail', gameData.value.thumbnail);
         
         // Add each image file separately
-        gameData.value.images.forEach(image => {
-          formData.append('images', image);
-        });
+        if (gameData.value.images && gameData.value.images.length > 0) {
+          gameData.value.images.forEach(image => {
+            formData.append('images', image);
+          });
+        }
 
         // Debug log for FormData contents
         console.log('FormData contents:');
@@ -409,10 +411,8 @@ export default {
     };
 
     const handleEditImagesChange = (event) => {
-      const files = Array.from(event.target.files);
-      if (files.length > 0) {
-        editData.value.newImages = files;
-      }
+      const files = event.target.files ? Array.from(event.target.files) : [];
+      editData.value.newImages = files;
     };
 
     const handleEditSubmit = async () => {
@@ -434,7 +434,7 @@ export default {
         }
         
         // Add new images if selected
-        if (editData.value.newImages.length > 0) {
+        if (editData.value.newImages && editData.value.newImages.length > 0) {
           editData.value.newImages.forEach(image => {
             formData.append('images', image);
           });
@@ -514,14 +514,16 @@ export default {
 
 .form {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
-  max-width: 600px;
+  max-width: 100%;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  justify-content: space-between;
 }
 
 .form-control {

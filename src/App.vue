@@ -1,17 +1,24 @@
 <template>
   <div class="app-wrapper">
-    <nav class="navbar">
+    <div v-if="isAdmin" class="admin-sidebar">
+      <h2>Admin Panel</h2>
+      <nav>
+        <router-link to="/" class="nav-item">Home</router-link>
+        <router-link to="/admin/games" class="nav-item">Games</router-link>
+        <router-link to="/admin/users" class="nav-item">Users</router-link>
+        <router-link to="/all-orders" class="nav-item">All Orders</router-link>
+        <button @click="logout" class="nav-item logout">Logout</button>
+      </nav>
+    </div>
+    <nav v-else class="navbar">
       <div class="navbar-brand">
         <router-link to="/" class="logo">Game Platform</router-link>
       </div>
       <div class="navbar-menu">
-        <router-link to="/games" class="nav-item">Games</router-link>
         <template v-if="isAuthenticated">
-          <router-link to="/my-games" class="nav-item">My Games</router-link>
+          <router-link to="/" class="nav-item">Home</router-link>
+          <router-link to="/games" class="nav-item">Games</router-link>
           <router-link to="/my-orders" class="nav-item">My Orders</router-link>
-          <template v-if="isAdmin">
-            <router-link to="/admin" class="nav-item">Admin Panel</router-link>
-          </template>
           <button @click="logout" class="nav-item logout">Logout</button>
         </template>
         <template v-else>
@@ -179,7 +186,7 @@ body {
 .main-content {
   flex: 1;
   padding: 2rem;
-  max-width: 1200px;
+
   margin: 0 auto;
   width: 100%;
 }
@@ -251,5 +258,57 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 1rem;
+}
+
+/* Admin sidebar styles */
+.admin-sidebar {
+  width: 15%;
+  background-color: #2c3e50;
+  color: white;
+  padding: 2rem 0;
+  height: 100%;
+  position: fixed;
+  left: 0;
+
+  z-index: 1000;
+}
+
+.admin-sidebar h2 {
+  padding: 0 1.5rem;
+  margin-bottom: 2rem;
+  font-size: 1.5rem;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  color: #ecf0f1;
+  text-decoration: none;
+  transition: background-color 0.3s;
+}
+
+.nav-item:hover {
+  background-color: #34495e;
+}
+
+.nav-item.router-link-active {
+  background-color: #3498db;
+  color: white;
+}
+
+.icon {
+  margin-right: 0.75rem;
+  font-size: 1.2rem;
+}
+
+/* Responsive styles for admin sidebar */
+@media screen and (max-width: 768px) {
+  .admin-sidebar {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    top: 0;
+  }
 }
 </style>

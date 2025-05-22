@@ -42,6 +42,16 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/payment-success',
+    name: 'PaymentSuccess',
+    component: () => import('../views/PaymentSuccess.vue')
+  },
+  {
+    path: '/payment-cancel',
+    name: 'PaymentCancel',
+    component: () => import('../views/PaymentCancel.vue')
+  },
+  {
     path: '/admin',
     name: 'Admin',
     component: () => import('../views/admin/Admin.vue'),
@@ -63,7 +73,14 @@ const routes = [
         component: () => import('../views/admin/Orders.vue')
       }
     ]
+  },
+  {
+    path: '/all-orders',
+    name: 'AllOrders',
+    component: () => import('../views/AllOrders.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
   }
+
 ];
 
 const router = createRouter({
