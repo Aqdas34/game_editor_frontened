@@ -66,7 +66,7 @@ export default {
     const typeFilter = ref('');
     const ageFilter = ref('');
     const loading = ref(true);
-    const ASSETS_URL = process.env.VUE_APP_ASSETS_URL || 'http://localhost:5000/uploads';
+    const ASSETS_URL = process.env.VUE_APP_ASSETS_URL || 'https://game-editor-backened.onrender.com/uploads';
 
     const allGames = computed(() => store.getters.allGames);
 

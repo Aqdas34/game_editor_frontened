@@ -272,7 +272,7 @@ export default {
     const error = ref('');
     const showEditModal = ref(false);
     const API_URL = process.env.VUE_APP_API_URL;
-    const ASSETS_URL = 'http://localhost:5000/uploads';
+    const ASSETS_URL = 'https://game-editor-backened.onrender.com/uploads';
     const gameData = ref({
       name: '',
       author: '',
