@@ -39,7 +39,7 @@
             }"
             @click="!isLoading && handleThumbnailClick(index)"
           >
-            <img :src="`${ASSETS_URL}/users/${userId}/${route.params.id}/${image}`" :alt="'Thumbnail ' + (index + 1)">
+            <img :src="isAdmin ? `${ASSETS_URL}/${image}` : `${ASSETS_URL}/users/${userId}/${route.params.id}/${image}`" :alt="'Thumbnail ' + (index + 1)">
             <span class="thumbnail-number">{{ index + 1 }}</span>
 
 
