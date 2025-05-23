@@ -83,15 +83,13 @@ import { PinturaEditor } from '@pqina/vue-pintura';
 import axios from 'axios';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
+// Pintura and plugins
 import {
-  // editor
   createDefaultImageReader,
   createDefaultImageWriter,
   createDefaultShapePreprocessor,
   locale_en_gb,
   getEditorDefaults,
-  
-  // plugins
   setPlugins,
   plugin_crop,
   plugin_crop_locale_en_gb,
@@ -102,54 +100,50 @@ import {
   plugin_finetune_defaults,
   plugin_finetune_locale_en_gb,
   plugin_annotate,
+  plugin_annotate_defaults,
   plugin_annotate_locale_en_gb,
   markup_editor_defaults,
   markup_editor_locale_en_gb,
 } from '@pqina/pintura';
 
-// Import Pintura styles
 import '@pqina/pintura/pintura.css';
 
-// Set up plugins
 setPlugins(plugin_crop, plugin_finetune, plugin_filter, plugin_annotate);
 
 export default {
   name: 'ImageEditor',
-  components: {
-    PinturaEditor
-  },
+  components: { PinturaEditor },
   setup() {
-    
-    const generateGuestSessionId = () => {
-      const timestamp = Date.now().toString(36);
-      const random = Math.random().toString(36).substr(2, 5);
-      localStorage.setItem('guestUserId', `GUEST-${timestamp}-${random}`);
-      return `GUEST-${timestamp}-${random}`;
-    };
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const userId = store.getters.currentUser?.id || localStorage.getItem('guestUserId') || generateGuestSessionId();
 
-    // Ensure axios sends the token for all requests
-    if (store.state.token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${store.state.token}`;
-    }
+    const generateGuestSessionId = () => {
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substr(2, 5);
+      const guestId = `GUEST-${timestamp}-${random}`;
+      localStorage.setItem('guestUserId', guestId);
+      return guestId;
+    };
+
+    const userId = store.getters.currentUser?.id || localStorage.getItem('guestUserId') || generateGuestSessionId();
+    const token = store.state.token || localStorage.getItem('token');
+    if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
     const name = ref('');
     const age = ref('');
     const sku = ref('');
- 
-    const selectedImageIndex = ref(0);
-    const showEditor = ref(true);
-    const currentImage = ref(null);
     const images = ref([]);
-    const API_URL = process.env.VUE_APP_API_URL;
+    const selectedImageIndex = ref(0);
+    const currentImage = ref(null);
     const inlineResult = ref(null);
-    const ASSETS_URL = process.env.VUE_APP_ASSETS_URL;
-    const shouldLockImages = ref(true); // Default to locked
+    const showEditor = ref(true);
+    const shouldLockImages = ref(true);
     const isLoading = ref(true);
-    const isAdmin = ref(false); // Add a ref to track admin status
+    const isAdmin = ref(store.getters.currentUser?.role === 'admin');
 
+    const API_URL = process.env.VUE_APP_API_URL;
+    const ASSETS_URL = process.env.VUE_APP_ASSETS_URL;
 
     const editorProps = {
       ...getEditorDefaults(),
@@ -158,6 +152,7 @@ export default {
       shapePreprocessor: createDefaultShapePreprocessor(),
       ...plugin_finetune_defaults,
       ...plugin_filter_defaults,
+      ...plugin_annotate_defaults,
       ...markup_editor_defaults,
       locale: {
         ...locale_en_gb,
@@ -169,11 +164,7 @@ export default {
       },
       layoutDirectionPreference: 'horizontal',
       layoutHorizontalUtilsPreference: 'right',
-      
-   
     };
-
-
 
     const handleThumbnailClick = (index) => {
       // If all images are unlocked (user owns the game) or it's one of the free images (first 2)
