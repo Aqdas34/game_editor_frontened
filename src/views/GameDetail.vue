@@ -39,7 +39,7 @@
             }"
             @click="!isLoading && handleThumbnailClick(index)"
           >
-            <img :src="isAdmin ? `${ASSETS_URL}/${image}` : `${ASSETS_URL}/users/${userId}/${route.params.id}/${image}`" :alt="'Thumbnail ' + (index + 1)">
+           <img :src="isAdmin ? `${ASSETS_URL}/${image}` : `${ASSETS_URL}/users/${userId}/${route.params.id}/${image}`" :alt="'Thumbnail ' + (index + 1)">
             <span class="thumbnail-number">{{ index + 1 }}</span>
 
 
@@ -83,14 +83,18 @@ import { PinturaEditor } from '@pqina/vue-pintura';
 import axios from 'axios';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
-// Pintura and plugins
+
 import {
+  // Core editor
+  getEditorDefaults,
   createDefaultImageReader,
   createDefaultImageWriter,
   createDefaultShapePreprocessor,
   locale_en_gb,
-  getEditorDefaults,
+
+
   setPlugins,
+  // Plugins
   plugin_crop,
   plugin_crop_locale_en_gb,
   plugin_filter,
@@ -100,70 +104,107 @@ import {
   plugin_finetune_defaults,
   plugin_finetune_locale_en_gb,
   plugin_annotate,
-  plugin_annotate_defaults,
   plugin_annotate_locale_en_gb,
+  plugin_decorate,
+  plugin_decorate_locale_en_gb,
+  markup_editor_defaults,
+  markup_editor_locale_en_gb,
+plugin_frame,
+plugin_frame_defaults,
+plugin_frame_locale_en_gb,
+plugin_resize,
+plugin_resize_locale_en_gb,
 
+  plugin_redact,
+  plugin_redact_locale_en_gb,
+  plugin_sticker,
+  plugin_sticker_locale_en_gb,
+  plugin_fill,
+  plugin_fill_locale_en_gb,
+
+  // Plugin locales
+
+  // Optional plugin defaults (if needed)
 } from '@pqina/pintura';
 
 import '@pqina/pintura/pintura.css';
-
-setPlugins(plugin_crop, plugin_finetune, plugin_filter, plugin_annotate);
-
+setPlugins(
+  plugin_crop,
+  plugin_filter,
+  plugin_finetune,
+  plugin_annotate,
+  plugin_decorate,
+  plugin_frame,
+  plugin_resize,
+  plugin_redact,
+  plugin_sticker,
+  plugin_fill,
+);
 export default {
   name: 'ImageEditor',
   components: { PinturaEditor },
   setup() {
-    const route = useRoute();
-    const router = useRouter();
-    const store = useStore();
-
-    const generateGuestSessionId = () => {
-      const timestamp = Date.now().toString(36);
-      const random = Math.random().toString(36).substr(2, 5);
-      const guestId = `GUEST-${timestamp}-${random}`;
-      localStorage.setItem('guestUserId', guestId);
-      return guestId;
-    };
-
-    const userId = store.getters.currentUser?.id || localStorage.getItem('guestUserId') || generateGuestSessionId();
-    const token = store.state.token || localStorage.getItem('token');
-    if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-    const name = ref('');
-    const age = ref('');
-    const sku = ref('');
-    const images = ref([]);
-    const selectedImageIndex = ref(0);
-    const currentImage = ref(null);
-    const inlineResult = ref(null);
-    const showEditor = ref(true);
-    const shouldLockImages = ref(true);
-    const isLoading = ref(true);
-    const isAdmin = ref(store.getters.currentUser?.role === 'admin');
-
-    const API_URL = process.env.VUE_APP_API_URL;
-    const ASSETS_URL = process.env.VUE_APP_ASSETS_URL;
-
     const editorProps = {
       ...getEditorDefaults(),
       imageReader: createDefaultImageReader(),
       imageWriter: createDefaultImageWriter(),
       shapePreprocessor: createDefaultShapePreprocessor(),
+
+      // Optional plugin defaults (can remove if not needed)
       ...plugin_finetune_defaults,
       ...plugin_filter_defaults,
-      ...plugin_annotate_defaults,
-
-      locale: {
-        ...locale_en_gb,
-        ...plugin_crop_locale_en_gb,
-        ...plugin_finetune_locale_en_gb,
-        ...plugin_filter_locale_en_gb,
-        ...plugin_annotate_locale_en_gb,
-
-      },
+      ...markup_editor_defaults,
+      ...plugin_frame_defaults,
+  locale: {
+    ...locale_en_gb,
+    ...plugin_crop_locale_en_gb,
+    ...plugin_filter_locale_en_gb,
+    ...plugin_finetune_locale_en_gb,
+    ...plugin_annotate_locale_en_gb,
+    ...plugin_decorate_locale_en_gb,
+    ...plugin_frame_locale_en_gb,
+    ...plugin_redact_locale_en_gb,
+    ...plugin_sticker_locale_en_gb,
+    ...plugin_fill_locale_en_gb,
+    ...plugin_resize_locale_en_gb,
+    ...markup_editor_locale_en_gb,
+  },
       layoutDirectionPreference: 'horizontal',
       layoutHorizontalUtilsPreference: 'right',
     };
+    const generateGuestSessionId = () => {
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substr(2, 5);
+      localStorage.setItem('guestUserId', `GUEST-${timestamp}-${random}`);
+      return `GUEST-${timestamp}-${random}`;
+    };
+    const route = useRoute();
+    const router = useRouter();
+    const store = useStore();
+    const userId = store.getters.currentUser?.id || localStorage.getItem('guestUserId') || generateGuestSessionId();
+
+    // Ensure axios sends the token for all requests
+    if (store.state.token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${store.state.token}`;
+    }
+    const name = ref('');
+    const age = ref('');
+    const sku = ref('');
+ 
+    const selectedImageIndex = ref(0);
+    const showEditor = ref(true);
+    const currentImage = ref(null);
+    const images = ref([]);
+    const API_URL = process.env.VUE_APP_API_URL;
+    const inlineResult = ref(null);
+    const ASSETS_URL = process.env.VUE_APP_ASSETS_URL;
+    const shouldLockImages = ref(true); // Default to locked
+    const isLoading = ref(true);
+    const isAdmin = ref(false); // Add a ref to track admin status
+
+
+
+
 
     const handleThumbnailClick = (index) => {
       // If all images are unlocked (user owns the game) or it's one of the free images (first 2)
