@@ -102,8 +102,7 @@ import {
   plugin_annotate,
   plugin_annotate_defaults,
   plugin_annotate_locale_en_gb,
-  markup_editor_defaults,
-  markup_editor_locale_en_gb,
+
 } from '@pqina/pintura';
 
 import '@pqina/pintura/pintura.css';
@@ -153,14 +152,14 @@ export default {
       ...plugin_finetune_defaults,
       ...plugin_filter_defaults,
       ...plugin_annotate_defaults,
-      ...markup_editor_defaults,
+
       locale: {
         ...locale_en_gb,
         ...plugin_crop_locale_en_gb,
         ...plugin_finetune_locale_en_gb,
         ...plugin_filter_locale_en_gb,
         ...plugin_annotate_locale_en_gb,
-        ...markup_editor_locale_en_gb,
+
       },
       layoutDirectionPreference: 'horizontal',
       layoutHorizontalUtilsPreference: 'right',
