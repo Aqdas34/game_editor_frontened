@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-container">
+  <div :class="['editor-container', { admin: isAdmin }]">
     <div class="editor-header">
       <div class="header-top">
         <h1>{{ name }}</h1>
@@ -119,10 +119,18 @@ export default {
     PinturaEditor
   },
   setup() {
+    
+    const generateGuestSessionId = () => {
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substr(2, 5);
+      localStorage.setItem('guestUserId', `GUEST-${timestamp}-${random}`);
+      return `GUEST-${timestamp}-${random}`;
+    };
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const userId = store.getters.currentUser?.id;
+    const userId = store.getters.currentUser?.id || localStorage.getItem('guestUserId') || generateGuestSessionId();
+
     // Ensure axios sends the token for all requests
     if (store.state.token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${store.state.token}`;
@@ -140,6 +148,7 @@ export default {
     const ASSETS_URL = process.env.VUE_APP_ASSETS_URL;
     const shouldLockImages = ref(true); // Default to locked
     const isLoading = ref(true);
+    const isAdmin = ref(false); // Add a ref to track admin status
 
 
     const editorProps = {
@@ -157,7 +166,10 @@ export default {
         ...plugin_filter_locale_en_gb,
         ...plugin_annotate_locale_en_gb,
         ...markup_editor_locale_en_gb,
-      }
+      },
+      layoutDirectionPreference: 'horizontal',
+      layoutHorizontalUtilsPreference: 'right',
+      
    
     };
 
@@ -187,8 +199,8 @@ export default {
         // Get auth token
         const token = localStorage.getItem('token') || store.getters.token;
         if (!token) {
-          alert('Please log in to purchase this game');
-          router.push('/login');
+          alert('Please register to purchase this game');
+          router.push('/register');
           return;
         }
         
@@ -231,14 +243,22 @@ export default {
         inlineResult.value = URL.createObjectURL(event.detail.dest);
         const formData = new FormData();
         formData.append('image', event.detail.dest);
-        formData.append('userId', userId);
         formData.append('gameId', route.params.id);
         formData.append('pageIndex', selectedImageIndex.value);
-        await axios.post(`${API_URL}/games/save-edited-image-for-user`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
+        if (isAdmin.value) {
+          await axios.post(`${API_URL}/games/save-edited-image`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+        } else {
+          formData.append('userId', userId);
+          await axios.post(`${API_URL}/games/save-edited-image-for-user`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+        }
         await fetchUserGameImages();
       } catch (error) {
         console.error('Error saving edited image:', error);
@@ -258,6 +278,7 @@ export default {
         if (!store.getters.isAuthenticated) {
           console.log('Not logged in - game not owned');
           shouldLockImages.value = true;
+          isLoading.value = false;
           return;
         }
 
@@ -283,40 +304,69 @@ export default {
       }
     };
 
-    // Duplicate images for user and load them
-    const fetchUserGameImages = async () => {
+    const fetchAdminGameImages = async () => {
       try {
         isLoading.value = true;
-        
-        // First check ownership directly
-        await checkGameOwnership();
-        
-        console.log('After ownership check, shouldLockImages =', shouldLockImages.value);
-
-        // Then load the game images
-        console.log('Calling duplicate-for-user:', userId, route.params.id);
-        await axios.post(`${API_URL}/games/${route.params.id}/duplicate-for-user`, { userId });
-        const response = await axios.get(`${API_URL}/games/${route.params.id}/user-images/${userId}`);
+        const response = await axios.get(`${API_URL}/games/${route.params.id}`);
         const game = response.data;
         name.value = game.name;
         age.value = game.ageGroup;
         sku.value = game.sku;
         images.value = game.images;
         if (images.value.length > 0) {
-          currentImage.value = `${ASSETS_URL}/users/${userId}/${route.params.id}/${images.value[0]}`;
+          currentImage.value = `${ASSETS_URL}/${images.value[0]}`;
         }
-        
-        // Final check of the state
-        console.log('FINAL STATE - Should images be locked?', shouldLockImages.value);
       } catch (error) {
-        console.error('Error fetching user game images:', error);
+        console.error('Error fetching admin game images:', error);
       } finally {
         isLoading.value = false;
       }
     };
 
+    // Modify fetchUserGameImages to conditionally call fetchAdminGameImages
+    const fetchUserGameImages = async () => {
+      if (isAdmin.value) {
+        await fetchAdminGameImages();
+      } else {
+        try {
+          isLoading.value = true;
+        
+          // First check ownership directly
+          await checkGameOwnership();
+          
+          console.log('After ownership check, shouldLockImages =', shouldLockImages.value);
+
+          // Then load the game images
+          console.log('Calling duplicate-for-user:', userId, route.params.id);
+          await axios.post(`${API_URL}/games/${route.params.id}/duplicate-for-user`, { userId });
+          const response = await axios.get(`${API_URL}/games/${route.params.id}/user-images/${userId}`);
+          const game = response.data;
+          name.value = game.name;
+          age.value = game.ageGroup;
+          sku.value = game.sku;
+          images.value = game.images;
+          if (images.value.length > 0) {
+            currentImage.value = `${ASSETS_URL}/users/${userId}/${route.params.id}/${images.value[0]}`;
+          }
+          
+          // Final check of the state
+          console.log('FINAL STATE - Should images be locked?', shouldLockImages.value);
+        } catch (error) {
+          console.error('Error fetching user game images:', error);
+        } finally {
+          isLoading.value = false;
+        }
+      }
+    };
+
+    // Check if the user is an admin
+    if (store.getters.currentUser?.role === 'admin') {
+      isAdmin.value = true;
+      shouldLockImages.value = false; // Admin should not have locked images
+    }
+
     console.log('store.getters.currentUser:', store.getters.currentUser);
-    console.log('userId:', userId);
+    console.log('User ID:', userId);
 
     // Add a watch for shouldLockImages to force UI refresh
     watch(shouldLockImages, (newValue) => {
@@ -328,9 +378,17 @@ export default {
       });
     });
 
-    watch(() => store.getters.currentUser, (newUser) => {
-      if (newUser && newUser.id) fetchUserGameImages();
+    watch(() => userId, (newUser) => {
+      console.log('User ID changed:', newUser);
+      if (newUser && newUser.id) {
+        console.log('Fetching user game images for user:', newUser.id);
+        fetchUserGameImages();
+      }
     }, { immediate: true });
+
+    // Ensure fetchUserGameImages is called on setup
+    fetchUserGameImages();
+    console.log('Initial fetchUserGameImages call made');
 
     return {
       name,
@@ -354,7 +412,8 @@ export default {
       route,
       ASSETS_URL,
       shouldLockImages,
-      isLoading
+      isLoading,
+      isAdmin
     };
   }
 };
@@ -366,6 +425,14 @@ export default {
   flex-direction: column;
   height: 100vh;
   background-color: #f5f5f5;
+  position: relative;
+  left: 0;
+
+}
+
+.editor-container.admin {
+  left: 15%;
+  width: 85%;
 }
 
 .editor-header {

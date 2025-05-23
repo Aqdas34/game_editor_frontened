@@ -146,7 +146,7 @@
     <div v-if="showEditModal" class="modal">
       <div class="modal-content">
         <h2>Edit Game</h2>
-        <form @submit.prevent="handleEditSubmit" class="form">
+        <form @submit.prevent="handleEditSubmit" class="form2">
           <div class="form-group">
             <label for="edit-name">Game Name</label>
             <input 
@@ -156,9 +156,7 @@
               required
               class="form-control"
             >
-          </div>
 
-          <div class="form-group">
             <label for="edit-author">Author</label>
             <input 
               type="text" 
@@ -167,9 +165,7 @@
               required
               class="form-control"
             >
-          </div>
-
-          <div class="form-group">
+       
             <label for="edit-type">Game Type</label>
             <select 
               id="edit-type" 
@@ -182,9 +178,7 @@
               <option value="strategy">Strategy</option>
               <option value="educational">Educational</option>
             </select>
-          </div>
-
-          <div class="form-group">
+       
             <label for="edit-ageGroup">Age Group</label>
             <select 
               id="edit-ageGroup" 
@@ -200,6 +194,10 @@
           </div>
 
           <div class="form-group">
+            <div v-if="editData.thumbnail" class="current-thumbnail">
+              <p>Current Thumbnail:</p>
+              <img :src="`${ASSETS_URL}/${editData.thumbnail}`" alt="Current thumbnail" class="thumbnail-preview">
+            </div>
             <label for="edit-thumbnail">Update Thumbnail</label>
             <input 
               type="file" 
@@ -209,13 +207,7 @@
               class="form-control"
             >
             <small class="form-text">Leave empty to keep current thumbnail</small>
-            <div v-if="editData.thumbnail" class="current-thumbnail">
-              <p>Current Thumbnail:</p>
-              <img :src="`${ASSETS_URL}/${editData.thumbnail}`" alt="Current thumbnail" class="thumbnail-preview">
-            </div>
-          </div>
-
-          <div class="form-group">
+     
             <label for="edit-images">Update Game Images</label>
             <input 
               type="file" 
@@ -234,7 +226,6 @@
                 </div>
               </div>
             </div>
-          </div>
 
           <div class="form-actions">
             <button 
@@ -251,6 +242,7 @@
             >
               Cancel
             </button>
+          </div>
           </div>
         </form>
       </div>
@@ -512,6 +504,12 @@ export default {
   margin-bottom: 2rem;
 }
 
+.form2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  max-width: 100%;
+}
 .form {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -641,9 +639,9 @@ export default {
   background-color: white;
   padding: 2rem;
   border-radius: 8px;
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
+
+  max-width: 80%;
+  max-height: 80%;
   overflow-y: auto;
 }
 

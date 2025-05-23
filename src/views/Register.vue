@@ -64,6 +64,7 @@
 import { ref } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
 
 export default {
   name: 'RegisterView',
@@ -94,7 +95,36 @@ export default {
           status: 'active'
         });
         
-        router.push('/');
+        // After registration, redirect to Stripe checkout
+   
+        const guestUserId = localStorage.getItem('guestUserId');
+        if (guestUserId) {
+          const lastViewedGameId = localStorage.getItem('lastViewedGameId');
+          const token = store.state.token;
+          if (lastViewedGameId) {
+            const response = await axios.post(`${process.env.VUE_APP_API_URL}/payments/create-checkout-session`, 
+              { gameId: lastViewedGameId },
+              { 
+                headers: { 
+                  Authorization: `Bearer ${token}` 
+                }
+              }
+            );
+
+            window.location.href = response.data.url;
+          }
+        
+        } else {
+          router.push('/');
+        }
+
+        if (guestUserId) {
+          await axios.post(`${process.env.VUE_APP_API_URL}/games/rename-folder`, {
+            oldName: guestUserId,
+            newName: store.getters.currentUser.id
+          });
+          localStorage.removeItem('guestUserId');
+        }
       } catch (err) {
         error.value = err.message || 'An error occurred during registration';
       } finally {

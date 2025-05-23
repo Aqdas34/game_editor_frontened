@@ -51,6 +51,7 @@ export default {
         // Confirm the order after successful payment
         if (orderId.value) {
           await confirmOrder(orderId.value);
+        
         } else {
           error.value = 'Order ID not found in session data';
           console.error('Order ID not found in session data');

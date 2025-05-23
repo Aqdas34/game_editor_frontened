@@ -22,6 +22,8 @@
           <button @click="logout" class="nav-item logout">Logout</button>
         </template>
         <template v-else>
+          <router-link to="/" class="nav-item">Home</router-link>
+          <router-link to="/games" class="nav-item">Games</router-link>
           <router-link to="/login" class="nav-item">Login</router-link>
           <router-link to="/register" class="nav-item">Register</router-link>
         </template>
@@ -34,7 +36,7 @@
       </main>
 
       <footer class="footer">
-        <p>&copy; 2024 Game Platform. All rights reserved.</p>
+        <p>&copy; 2025 Game Platform. All rights reserved.</p>
       </footer>
     </div>
   </div>
@@ -56,7 +58,7 @@ export default {
 
     const logout = async () => {
       await store.dispatch('logout');
-      router.push('/login');
+      router.push('/');
     };
 
     return {

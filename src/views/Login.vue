@@ -46,6 +46,7 @@
 import { ref } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter, useRoute } from 'vue-router';
+import axios from 'axios';
 
 export default {
   name: 'LoginView',
@@ -84,6 +85,15 @@ export default {
           console.log('Redirecting to:', route.query.redirect || '/');
           const redirectPath = route.query.redirect || '/';
           await router.push(redirectPath);
+
+          const guestUserId = localStorage.getItem('guestUserId');
+          if (guestUserId) {
+            await axios.post(`${process.env.VUE_APP_API_URL}/games/rename-folder`, {
+              oldName: guestUserId,
+              newName: response.user.id
+            });
+            localStorage.removeItem('guestUserId');
+          }
         } else {
           throw new Error('Invalid login response');
         }

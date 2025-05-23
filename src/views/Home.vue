@@ -1,5 +1,5 @@
 <template>
-  <div class="home">
+  <div :class="['home', { admin: isAdmin }]">
     <section class="hero">
       <h1>Welcome to Game Platform</h1>
       <p>Discover and play interactive games with our powerful image editor</p>
@@ -47,29 +47,24 @@ export default {
   setup() {
     const store = useStore();
     const router = useRouter();
-
+    if(localStorage.getItem('guestUserId')){
+      localStorage.removeItem('guestUserId');
+    }
     const latestGames = computed(() => {
       return store.getters.allGames.slice(0, 4);
     });
 
     const isAuthenticated = computed(() => store.getters.isAuthenticated);
+    const isAdmin = computed(() => store.getters.currentUser?.role === 'admin');
 
     const assetUrl = process.env.VUE_APP_ASSETS_URL;
     console.log('Asset URL:', assetUrl);
     const navigateToGames = () => {
-      if (isAuthenticated.value) {
-        router.push('/games');
-      } else {
-        router.push('/login');
-      }
+      router.push('/games');
     };
 
     const viewGame = (gameId) => {
-      if (isAuthenticated.value) {
-        router.push(`/games/${gameId}`);
-      } else {
-        router.push('/login');
-      }
+      router.push(`/games/${gameId}`);
     };
 
     onMounted(async () => {
@@ -85,7 +80,8 @@ export default {
       navigateToGames,
       viewGame,
       isAuthenticated,
-      assetUrl
+      assetUrl,
+      isAdmin
     };
   }
 };
@@ -96,6 +92,13 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  position: relative;
+  left: 0;
+}
+
+.home.admin {
+  left: 10%;
+  width: 90%;
 }
 
 .hero {
